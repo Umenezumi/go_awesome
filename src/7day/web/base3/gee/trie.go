@@ -25,7 +25,7 @@ func (n *node) matchChild(part string) *node {
 func (n *node) matchChildren(part string) []*node {
 	matchNodes := make([]*node, 0)
 	for _, child := range n.children {
-		if child.part == part || n.isWild {
+		if child.part == part || child.isWild {
 			matchNodes = append(matchNodes, child)
 		}
 	}

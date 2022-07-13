@@ -20,16 +20,17 @@ func newRouter() *router {
 }
 
 func (r *router) addRouter(method, pattern string, handler HandlerFunc) {
-	parts := r.parsePattern(pattern)
+	parts := parsePattern(pattern)
 
 	key := fmt.Sprintf("%s-%s", method, pattern)
 	log.Printf("Route %4s - %s", method, pattern)
 
-	if _, ok := r.roots[method]; ok {
+	if _, ok := r.roots[method]; !ok {
 		r.roots[method] = &node{}
 	}
 
-	r.roots[method].insert(pattern, parts, 0)
+	n := r.roots[method]
+	n.insert(pattern, parts, 0)
 	r.handlers[key] = handler
 }
 
@@ -45,26 +46,35 @@ func (r *router) getRoute(method string, path string) (*node, map[string]string)
 	n := root.search(searchParts, 0)
 
 	if n != nil {
-		parts := r.parsePattern(n.pattern)
+		parts := parsePattern(n.pattern)
 		// 解析 param
-		for _, part := range parts {
+		for index, part := range parts {
 			if part[0] == ':' {
-
+				params[part[1:]] = searchParts[index]
+			}
+			if part[0] == '*' && len(part) > 1 {
+				params[part[1:]] = strings.Join(searchParts[index:], "/")
+				break
 			}
 		}
+		return n, params
 	}
+	return nil, nil
 }
 
 func (r *router) handle(c *Context) {
-	key := c.Method + "-" + c.Path
-	if handler, ok := r.handlers[key]; ok {
-		handler(c)
+	n, params := r.getRoute(c.Method, c.Path)
+	if n != nil {
+		c.Params = params
+		key := fmt.Sprintf("%s-%s", c.Method, n.pattern)
+		r.handlers[key](c)
 	} else {
 		c.String(http.StatusNotFound, "404 NOT FOUND: %s\n", c.Path)
 	}
+
 }
 
-func (r router) parsePattern(pattern string) []string {
+func parsePattern(pattern string) []string {
 	vs := strings.Split(pattern, "/")
 
 	parts := make([]string, 0)
